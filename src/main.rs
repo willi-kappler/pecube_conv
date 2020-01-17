@@ -21,11 +21,11 @@ fn create_logger(filename: &str) {
 }
 
 fn convert_files<R: Read>(number_of_nodes: u32, mut temperature_field_sub: R, mut time_temperature_history: R, mut velocity_info: R) -> io::Result<()> {
+    // Read in temperature field sub time step
     let num_of_sub_steps = temperature_field_sub.read_u32::<BigEndian>()?;
     debug!("num_of_sub_steps: {}", num_of_sub_steps);
     let current_step = temperature_field_sub.read_u32::<BigEndian>()?;
     debug!("current_step: {}", current_step);
-
 
     for sub_step1 in 1..(num_of_sub_steps + 1) {
         let dt = temperature_field_sub.read_f64::<BigEndian>()?;
@@ -46,6 +46,68 @@ fn convert_files<R: Read>(number_of_nodes: u32, mut temperature_field_sub: R, mu
                 break
             }
             // TODO: write output to file
+        }
+    }
+
+
+    // Read in time temperature history
+    let num_of_points = time_temperature_history.read_u32::<BigEndian>()?;
+    debug!("num_of_points: {}", num_of_points);
+    let current_step = time_temperature_history.read_u32::<BigEndian>()?;
+    debug!("current_step: {}", current_step);
+    let ntime = time_temperature_history.read_u32::<BigEndian>()?;
+    debug!("ntime: {}", ntime);
+
+    for sub_step1 in 1..(ntime + 1) {
+        let sub_step2 = time_temperature_history.read_u32::<BigEndian>()?;
+        let time_history_value1 = time_temperature_history.read_f64::<BigEndian>()?;
+        if sub_step1 != sub_step2 {
+            error!("Number of sub steps do not match: {} != {}", sub_step1, sub_step2);
+            break
+        }
+    }
+
+    for sub_step1 in 1..(ntime + 1) {
+        for id1 in 1..(num_of_points + 1) {
+            let id2 = time_temperature_history.read_u32::<BigEndian>()?;
+            let temperature = time_temperature_history.read_f64::<BigEndian>()?;
+            if id1 != id2 {
+                error!("Node id does not match: {} != {}", id1, id2);
+                break
+            }
+            let px = time_temperature_history.read_f64::<BigEndian>()?;
+            let py = time_temperature_history.read_f64::<BigEndian>()?;
+            let pz = time_temperature_history.read_f64::<BigEndian>()?;
+            let vx = time_temperature_history.read_f64::<BigEndian>()?;
+            let vy = time_temperature_history.read_f64::<BigEndian>()?;
+            let vz = time_temperature_history.read_f64::<BigEndian>()?;
+        }
+    }
+
+
+    // Read in velocity info
+    let start_step = velocity_info.read_u32::<BigEndian>()?;
+    debug!("start_step: {}", start_step);
+    let number_of_surface_nodes = velocity_info.read_u32::<BigEndian>()?;
+    debug!("number_of_surface_nodes: {}", number_of_surface_nodes);
+
+    for current_step1 in (0..start_step).rev() {
+        let current_step2 = velocity_info.read_u32::<BigEndian>()?;
+        if current_step1 != current_step2 {
+            error!("Steps to not match: {} != {}", current_step1, current_step2)
+        }
+        for current_node1 in 1..(number_of_surface_nodes + 1) {
+            let current_node2 = velocity_info.read_u32::<BigEndian>()?;
+            if current_node1 != current_node2 {
+                error!("Node id does not match: {} != {}", current_node1, current_node2);
+                break
+            }
+            let px = velocity_info.read_f64::<BigEndian>()?;
+            let py = velocity_info.read_f64::<BigEndian>()?;
+            let pz = velocity_info.read_f64::<BigEndian>()?;
+            let vx = velocity_info.read_f64::<BigEndian>()?;
+            let vy = velocity_info.read_f64::<BigEndian>()?;
+            let vz = velocity_info.read_f64::<BigEndian>()?;
         }
     }
 
