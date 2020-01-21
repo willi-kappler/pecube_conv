@@ -85,9 +85,13 @@ fn convert_files(name_temperature_field_sub: &str, name_time_temperature_history
     writeln!(out_temperature_field_sub, "# current_step, sub_step, dt, time, node_id, px, py, pz, temperature")?;
 
     for sub_step1 in 1..(num_of_sub_steps + 1) {
+        debug!("sub_step1: {}", sub_step1);
         let dt = in_temperature_field_sub.read_f64::<LittleEndian>()?;
+        debug!("dt: {}", dt);
         let sub_step2 = in_temperature_field_sub.read_u32::<LittleEndian>()?;
+        debug!("sub_step2: {}", sub_step2);
         let time_value = in_temperature_field_sub.read_f64::<LittleEndian>()?;
+        debug!("time_value: {}", time_value);
         if sub_step1 != sub_step2 {
             error!("Number of sub steps do not match: {} != {}", sub_step1, sub_step2);
             return Err(ConvertError::SubStep)
@@ -118,8 +122,11 @@ fn convert_files(name_temperature_field_sub: &str, name_time_temperature_history
     writeln!(out_time_temperature_history, "# current_step, ntime, sub_step, time, node_id, temperature, px, py, pz, vx, vy, vz")?;
 
     for sub_step1 in 1..(ntime + 1) {
+        debug!("sub_step1: {}", sub_step1);
         let sub_step2 = in_time_temperature_history.read_u32::<LittleEndian>()?;
+        debug!("sub_step2: {}", sub_step2);
         time_history_values.push(in_time_temperature_history.read_f64::<LittleEndian>()?);
+        debug!("time_history_values[i]: {}", time_history_values[(sub_step1 - 1) as usize]);
         if sub_step1 != sub_step2 {
             error!("Number of sub steps do not match: {} != {}", sub_step1, sub_step2);
             return Err(ConvertError::SubStep)
@@ -155,7 +162,9 @@ fn convert_files(name_temperature_field_sub: &str, name_time_temperature_history
     writeln!(out_velocity_info, "# current_step, node_id, px, py, pz, vx, vy, vz")?;
 
     for current_step1 in (0..start_step).rev() {
+        debug!("current_step1: {}", current_step1);
         let current_step2 = in_velocity_info.read_u32::<LittleEndian>()?;
+        debug!("current_step2: {}", current_step2);
         if current_step1 != current_step2 {
             error!("Steps to not match: {} != {}", current_step1, current_step2);
             return Err(ConvertError::SubStep)
