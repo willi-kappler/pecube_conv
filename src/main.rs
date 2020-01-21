@@ -13,6 +13,8 @@ enum ConvertError {
     IoError(io::Error),
     NodeID,
     SubStep,
+    Step,
+    FileStep,
 }
 
 impl From<io::Error> for ConvertError {
@@ -27,6 +29,8 @@ impl fmt::Display for ConvertError {
             ConvertError::IoError(e) =>  write!(f, "{}", e),
             ConvertError::NodeID => write!(f, "The node ID does not match"),
             ConvertError::SubStep => write!(f, "The sub step index does not match"),
+            ConvertError::Step => write!(f, "The step index does not match"),
+            ConvertError::FileStep => write!(f, "The file step index does not match"),
         }
     }
 }
@@ -45,7 +49,7 @@ fn create_logger(filename: &str) {
 }
 
 fn convert_files(name_temperature_field_sub: &str, name_time_temperature_history: &str,
-        name_velocity_info: &str) -> Result<(), ConvertError> {
+        name_velocity_info: &str, current_file_step: u32) -> Result<(), ConvertError> {
     let name_in_temperature_field_sub = format!("{}.bin", name_temperature_field_sub);
     let name_out_temperature_field_sub = format!("{}.txt", name_temperature_field_sub);
     debug!("Open input file: {}", name_in_temperature_field_sub);
@@ -76,24 +80,25 @@ fn convert_files(name_temperature_field_sub: &str, name_time_temperature_history
 
     // Read in temperature field sub time step
     let num_of_sub_steps = in_temperature_field_sub.read_u32::<LittleEndian>()?;
-    debug!("num_of_sub_steps: {}", num_of_sub_steps);
+    debug!("temperature_field_sub: num_of_sub_steps: {}", num_of_sub_steps);
     let current_step = in_temperature_field_sub.read_u32::<LittleEndian>()?;
     debug!("current_step: {}", current_step);
-    let num_of_points = in_time_temperature_history.read_u32::<LittleEndian>()?;
-    debug!("num_of_points: {}", num_of_points);
+    let num_of_points = in_temperature_field_sub.read_u32::<LittleEndian>()?;
+    debug!("num_of_points (model): {}", num_of_points);
+    // let num_of_points = 1400;
 
     writeln!(out_temperature_field_sub, "# current_step, sub_step, dt, time, node_id, px, py, pz, temperature")?;
 
     for sub_step1 in 1..(num_of_sub_steps + 1) {
         debug!("sub_step1: {}", sub_step1);
         let dt = in_temperature_field_sub.read_f64::<LittleEndian>()?;
-        debug!("dt: {}", dt);
+        debug!("    dt: {}", dt);
         let sub_step2 = in_temperature_field_sub.read_u32::<LittleEndian>()?;
-        debug!("sub_step2: {}", sub_step2);
+        debug!("    sub_step2: {}", sub_step2);
         let time_value = in_temperature_field_sub.read_f64::<LittleEndian>()?;
-        debug!("time_value: {}", time_value);
+        debug!("    time_value: {}", time_value);
         if sub_step1 != sub_step2 {
-            error!("Number of sub steps do not match: {} != {}", sub_step1, sub_step2);
+            error!("    Number of sub steps do not match: {} != {}", sub_step1, sub_step2);
             return Err(ConvertError::SubStep)
         }
         for i in 1..(num_of_points + 1) {
@@ -103,7 +108,7 @@ fn convert_files(name_temperature_field_sub: &str, name_time_temperature_history
             let pz = in_temperature_field_sub.read_f64::<LittleEndian>()?;
             let temp = in_temperature_field_sub.read_f64::<LittleEndian>()?;
             if i != n_id {
-                error!("Node id does not match: {} != {}", i, n_id);
+                error!("        Node id does not match: {} != {}", i, n_id);
                 return Err(ConvertError::NodeID)
             }
             writeln!(out_temperature_field_sub, "{}, {}, {}, {}, {}, {}, {}, {}, {}", current_step,
@@ -113,66 +118,88 @@ fn convert_files(name_temperature_field_sub: &str, name_time_temperature_history
 
 
     // Read in time temperature history
-    let current_step = in_time_temperature_history.read_u32::<LittleEndian>()?;
-    debug!("current_step: {}", current_step);
-    let ntime = in_time_temperature_history.read_u32::<LittleEndian>()?;
-    debug!("ntime: {}", ntime);
-
-    let mut time_history_values: Vec<f64> = Vec::new();
-    writeln!(out_time_temperature_history, "# current_step, ntime, sub_step, time, node_id, temperature, px, py, pz, vx, vy, vz")?;
-
-    for sub_step1 in 1..(ntime + 1) {
-        debug!("sub_step1: {}", sub_step1);
-        let sub_step2 = in_time_temperature_history.read_u32::<LittleEndian>()?;
-        debug!("sub_step2: {}", sub_step2);
-        time_history_values.push(in_time_temperature_history.read_f64::<LittleEndian>()?);
-        debug!("time_history_values[i]: {}", time_history_values[(sub_step1 - 1) as usize]);
-        if sub_step1 != sub_step2 {
-            error!("Number of sub steps do not match: {} != {}", sub_step1, sub_step2);
-            return Err(ConvertError::SubStep)
-        }
+    let num_of_points = in_time_temperature_history.read_u32::<LittleEndian>()?;
+    debug!("num_of_points (surface): {}", num_of_points);
+    let outer_step = in_time_temperature_history.read_u32::<LittleEndian>()?;
+    debug!("outer_step: {}", outer_step);
+    if outer_step != current_file_step {
+        error!("Number of file steps do not match: {} != {}", outer_step, current_file_step);
+        return Err(ConvertError::FileStep)
     }
 
-    for sub_step1 in 1..(ntime + 1) {
-        for id1 in 1..(num_of_points + 1) {
-            let id2 = in_time_temperature_history.read_u32::<LittleEndian>()?;
-            let temperature = in_time_temperature_history.read_f64::<LittleEndian>()?;
-            if id1 != id2 {
-                error!("Node id does not match: {} != {}", id1, id2);
-                return Err(ConvertError::NodeID)
+    // let outer_step = current_file_step
+
+    for current_step1 in (1..(outer_step + 1)).rev() {
+        let current_step2 = in_time_temperature_history.read_u32::<LittleEndian>()?;
+        debug!("time_temperature_history: current_step2: {}", current_step2);
+        let ntime = in_time_temperature_history.read_u32::<LittleEndian>()?;
+        debug!("ntime: {}", ntime);
+
+        if current_step1 != current_step2 {
+            error!("Number of steps do not match: {} != {}", current_step1, current_step2);
+            return Err(ConvertError::Step)
+        }
+
+        let mut time_history_values: Vec<f64> = Vec::new();
+        writeln!(out_time_temperature_history, "# current_step, ntime, sub_step, time, node_id, temperature, px, py, pz, vx, vy, vz")?;
+
+        for sub_step1 in 1..(ntime + 1) {
+            debug!("sub_step1: {}", sub_step1);
+            let sub_step2 = in_time_temperature_history.read_u32::<LittleEndian>()?;
+            debug!("    sub_step2: {}", sub_step2);
+            time_history_values.push(in_time_temperature_history.read_f64::<LittleEndian>()?);
+            debug!("    time_history_values[i]: {}", time_history_values[(sub_step1 - 1) as usize]);
+            if sub_step1 != sub_step2 {
+                error!("Number of sub steps do not match: {} != {}", sub_step1, sub_step2);
+                return Err(ConvertError::SubStep)
             }
-            let px = in_time_temperature_history.read_f64::<LittleEndian>()?;
-            let py = in_time_temperature_history.read_f64::<LittleEndian>()?;
-            let pz = in_time_temperature_history.read_f64::<LittleEndian>()?;
-            let vx = in_time_temperature_history.read_f64::<LittleEndian>()?;
-            let vy = in_time_temperature_history.read_f64::<LittleEndian>()?;
-            let vz = in_time_temperature_history.read_f64::<LittleEndian>()?;
-            writeln!(out_time_temperature_history, "{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}", current_step,
-                ntime, sub_step1, time_history_values[sub_step1 as usize], id1, temperature, px, py, pz, vx, vy, vz)?;
+        }
+
+        for sub_step1 in 1..(ntime + 1) {
+            debug!("sub_step1: {}", sub_step1);
+            for id1 in 1..(num_of_points + 1) {
+                debug!("id1: {}", id1);
+                let id2 = in_time_temperature_history.read_u32::<LittleEndian>()?;
+                debug!("    id2: {}", id2);
+                let temperature = in_time_temperature_history.read_f64::<LittleEndian>()?;
+                debug!("    temperature: {}", temperature);
+                if id1 != id2 {
+                    error!("        Node id does not match: {} != {}", id1, id2);
+                    return Err(ConvertError::NodeID)
+                }
+                let px = in_time_temperature_history.read_f64::<LittleEndian>()?;
+                let py = in_time_temperature_history.read_f64::<LittleEndian>()?;
+                let pz = in_time_temperature_history.read_f64::<LittleEndian>()?;
+                let vx = in_time_temperature_history.read_f64::<LittleEndian>()?;
+                let vy = in_time_temperature_history.read_f64::<LittleEndian>()?;
+                let vz = in_time_temperature_history.read_f64::<LittleEndian>()?;
+                writeln!(out_time_temperature_history, "{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}", current_step,
+                    ntime, sub_step1, time_history_values[(sub_step1 - 1) as usize], id1, temperature, px, py, pz, vx, vy, vz)?;
+            }
         }
     }
 
 
     // Read in velocity info
     let start_step = in_velocity_info.read_u32::<LittleEndian>()?;
-    debug!("start_step: {}", start_step);
+    debug!("velocity_info: start_step: {}", start_step);
     let number_of_surface_nodes = in_velocity_info.read_u32::<LittleEndian>()?;
     debug!("number_of_surface_nodes: {}", number_of_surface_nodes);
 
     writeln!(out_velocity_info, "# current_step, node_id, px, py, pz, vx, vy, vz")?;
 
-    for current_step1 in (0..start_step).rev() {
+    for current_step1 in (1..(start_step + 1)).rev() {
         debug!("current_step1: {}", current_step1);
         let current_step2 = in_velocity_info.read_u32::<LittleEndian>()?;
-        debug!("current_step2: {}", current_step2);
+        debug!("    current_step2: {}", current_step2);
         if current_step1 != current_step2 {
-            error!("Steps to not match: {} != {}", current_step1, current_step2);
+            error!("    Steps to not match: {} != {}", current_step1, current_step2);
             return Err(ConvertError::SubStep)
         }
         for current_node1 in 1..(number_of_surface_nodes + 1) {
             let current_node2 = in_velocity_info.read_u32::<LittleEndian>()?;
             if current_node1 != current_node2 {
-                error!("Node id does not match: {} != {}", current_node1, current_node2);
+                error!("        Node id does not match: {} != {}", current_node1, current_node2);
                 return Err(ConvertError::NodeID)
             }
             let px = in_velocity_info.read_f64::<LittleEndian>()?;
@@ -200,7 +227,7 @@ fn process_files(output_path: &str) -> Result<(), ConvertError> {
         let name_time_temperature_history = format!("{}/time_temperature_history_{:04}", output_path, i);
         let name_velocity_info = format!("{}/velocity_info_{:04}", output_path, i);
 
-        convert_files(&name_temperature_field_sub, &name_time_temperature_history, &name_velocity_info)?;
+        convert_files(&name_temperature_field_sub, &name_time_temperature_history, &name_velocity_info, i)?;
     }
 
     Ok(())
