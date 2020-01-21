@@ -52,7 +52,7 @@ fn convert_files(name_temperature_field_sub: &str, name_time_temperature_history
     let f = File::open(name_in_temperature_field_sub)?;
     let mut in_temperature_field_sub = BufReader::new(f);
     debug!("Open output file: {}", name_out_temperature_field_sub);
-    let f = File::open(name_out_temperature_field_sub)?;
+    let f = File::create(name_out_temperature_field_sub)?;
     let mut out_temperature_field_sub = BufWriter::new(f);
 
     let name_in_time_temperature_history = format!("{}.bin", name_time_temperature_history);
@@ -61,7 +61,7 @@ fn convert_files(name_temperature_field_sub: &str, name_time_temperature_history
     let f = File::open(name_in_time_temperature_history)?;
     let mut in_time_temperature_history = BufReader::new(f);
     debug!("Open output file: {}", name_out_time_temperature_history);
-    let f = File::open(name_out_time_temperature_history)?;
+    let f = File::create(name_out_time_temperature_history)?;
     let mut out_time_temperature_history = BufWriter::new(f);
 
     let name_in_velocity_info = format!("{}.bin", name_velocity_info);
@@ -70,7 +70,7 @@ fn convert_files(name_temperature_field_sub: &str, name_time_temperature_history
     let f = File::open(name_in_velocity_info)?;
     let mut in_velocity_info = BufReader::new(f);
     debug!("Open output file: {}", name_out_velocity_info);
-    let f = File::open(name_out_velocity_info)?;
+    let f = File::create(name_out_velocity_info)?;
     let mut out_velocity_info = BufWriter::new(f);
 
 
@@ -182,6 +182,7 @@ fn convert_files(name_temperature_field_sub: &str, name_time_temperature_history
 fn process_files(output_path: &str) -> Result<(), ConvertError> {
     // Files to read in:
     // temperature_field_sub_0001.bin
+    // mpi_mc_process_0000/output/temperature_field_sub_0001.bin
     // time_temperature_history_0001.bin
     // velocity_info_0001.bin
 
