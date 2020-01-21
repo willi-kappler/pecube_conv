@@ -173,7 +173,7 @@ fn convert_files(name_temperature_field_sub: &str, name_time_temperature_history
                 let vx = in_time_temperature_history.read_f64::<LittleEndian>()?;
                 let vy = in_time_temperature_history.read_f64::<LittleEndian>()?;
                 let vz = in_time_temperature_history.read_f64::<LittleEndian>()?;
-                writeln!(out_time_temperature_history, "{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}", current_step,
+                writeln!(out_time_temperature_history, "{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}", current_step1,
                     ntime, sub_step1, time_history_values[(sub_step1 - 1) as usize], id1, temperature, px, py, pz, vx, vy, vz)?;
             }
         }
