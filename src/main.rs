@@ -201,7 +201,7 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
 
-    if args.len() != 3 {
+    if args.len() != 2 {
         error!("You have to specify the path to the Pecube output files:");
         info!("{} output/", args[0]);
         process::exit(1);
