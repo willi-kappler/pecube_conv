@@ -23,7 +23,11 @@ impl From<io::Error> for ConvertError {
 
 impl fmt::Display for ConvertError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "") // TODO: display error variants
+        match self {
+            ConvertError::IoError(e) =>  write!(f, "{}", e),
+            ConvertError::NodeID => write!(f, "The node ID does not match"),
+            ConvertError::SubStep => write!(f, "The sub step index does not match"),
+        }
     }
 }
 
