@@ -129,6 +129,8 @@ fn convert_files(name_temperature_field_sub: &str, name_time_temperature_history
 
     // let outer_step = current_file_step
 
+    writeln!(out_time_temperature_history, "# current_step, ntime, sub_step, time, node_id, temperature, px, py, pz, vx, vy, vz")?;
+
     for current_step1 in (1..(outer_step + 1)).rev() {
         let current_step2 = in_time_temperature_history.read_u32::<LittleEndian>()?;
         debug!("time_temperature_history: current_step2: {}", current_step2);
@@ -141,7 +143,6 @@ fn convert_files(name_temperature_field_sub: &str, name_time_temperature_history
         }
 
         let mut time_history_values: Vec<f64> = Vec::new();
-        writeln!(out_time_temperature_history, "# current_step, ntime, sub_step, time, node_id, temperature, px, py, pz, vx, vy, vz")?;
 
         for sub_step1 in 1..(ntime + 1) {
             debug!("sub_step1: {}", sub_step1);
